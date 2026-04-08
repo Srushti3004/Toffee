@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍬 Toffee Sales Tracker</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%), url('https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=800') no-repeat center center fixed;
+            background-size: cover;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #d2691e;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        select, input, button {
+            padding: 10px;
+            border: 2px solid #d2691e;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        select {
+            background-color: #fff8dc;
+        }
+        input {
+            background-color: #f5f5dc;
+        }
+        button {
+            background-color: #d2691e;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #a0522d;
+        }
+        canvas {
+            max-width: 100%;
+            height: 400px;
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #d2691e;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #ffe4b5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🍬 Toffee Sales Tracker</h2>
+        <div class="form-group">
+            <select id="price">
+                <option value="5">₹5</option>
+                <option value="10">₹10</option>
+                <option value="30">₹30</option>
+                <option value="50">₹50</option>
+                <option value="100">₹100</option>
+            </select>
+            <input id="qty" type="number" placeholder="Quantity">
+            <button type="button" onclick="send()">Submit Sale</button>
+        </div>
+        <canvas id="chart"></canvas>
+        <table id="sales-table" border="1" cellspacing="0" cellpadding="6">
+            <thead>
+                <tr>
+                    <th>Sale</th>
+                    <th>Price</th>
+                    <th>Quantity</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+async function send() {
+  const price = document.getElementById("price").value;
+  const quantity = document.getElementById("qty").value;
+
+  if (!quantity || Number(quantity) <= 0) {
+    alert('Please enter a valid quantity.');
+    return;
+  }
+
+  try {
+    const res = await fetch("http://127.0.0.1:5000/add-sale", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ price, quantity })
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Server error: ${res.status} ${text}`);
+    }
+
+    document.getElementById("qty").value = '';
+    await loadChart();
+  } catch (err) {
+    console.error(err);
+    alert('Unable to submit sale: ' + err.message);
+  }
+}
+
+function renderTable(data) {
+  const tbody = document.querySelector('#sales-table tbody');
+  tbody.innerHTML = '';
+
+  data.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>Sale ${row.id}</td>
+      <td>₹${row.price}</td>
+      <td>${row.quantity}</td>
+      <td>₹${row.total}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+let salesChart;
+async function loadChart() {
+  const res = await fetch("http://127.0.0.1:5000/get-sales");
+  const data = await res.json();
+
+  renderTable(data);
+
+  const labels = data.map(x => `Sale ${x.id}`);
+  const totals = data.map(x => x.total);
+
+  const ctx = document.getElementById("chart");
+  if (salesChart) {
+    salesChart.destroy();
+  }
+
+  salesChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Revenue",
+        data: totals,
+        backgroundColor: 'rgba(210, 105, 30, 0.2)',
+        borderColor: 'rgba(210, 105, 30, 1)',
+        borderWidth: 2,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+}
+
+window.onload = loadChart;
+</script>
